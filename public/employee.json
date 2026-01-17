@@ -1,0 +1,110 @@
+[
+    {
+        "id": 1,
+        "name": "Abda Samio Shobhan",
+        "joinDate": "N/A",
+        "phone": "01759805243",
+        "address": "Magnolia Arzudas Lakehouse, House no 43, Lakeview Road, Block E, Sector 2, Aftab Nagar, Merul Badda",
+        "email": "abda@strategybyte.com.au",
+        "dob": "8/20/1996",
+        "designation": "CTO",
+        "bloodGroup": "AB+",
+        "emergencyContact": "01727653091"
+    },
+    {
+        "id": 2,
+        "name": "Mehedi Rahman Ullash",
+        "joinDate": "15-Jan-25",
+        "phone": "01685220712",
+        "address": "48-Al-Amin Road, Green Road, Kathal Bagan, Dhaka 1205",
+        "email": "mehedi@strategybyte.com.au",
+        "dob": "10/15/1995",
+        "designation": "Digital Marketing Specialist",
+        "bloodGroup": "B+",
+        "emergencyContact": "01620569114"
+    },
+    {
+        "id": 3,
+        "name": "Tanjil Alam Shovon",
+        "joinDate": "1-Sep-25",
+        "phone": "01823476131",
+        "address": "Ka-187 Mia Bari, NSU Road, Kuril, Vatara, Dhaka 1229",
+        "email": "tanjil@strategybyte.com.au",
+        "dob": "1/20/1997",
+        "designation": "Digital Marketing Specialist",
+        "bloodGroup": "A+",
+        "emergencyContact": "01682746879"
+    },
+    {
+        "id": 4,
+        "name": "Sadab Mahmud Dipto",
+        "joinDate": "5-Jan-26",
+        "phone": "01759056960",
+        "address": "565/C, Khilgaon, Dhaka 1219",
+        "email": "sadab@strategybyte.com.au",
+        "dob": "2/25/2002",
+        "designation": "Full-Stack Engineer",
+        "bloodGroup": "B+",
+        "emergencyContact": "01914436042"
+    },
+    {
+        "id": 5,
+        "name": "Tausif Mahmud",
+        "joinDate": "1-Nov-25",
+        "phone": "01747636871",
+        "address": "264/2 Middle Pirerbagh Dhaka 1216",
+        "email": "tausif@strategybyte.com.au",
+        "dob": "11/25/2000",
+        "designation": "Full-Stack Engineer",
+        "bloodGroup": "B+",
+        "emergencyContact": "017113402021"
+    },
+    {
+        "id": 6,
+        "name": "Mohammad Tanvirul Hasan",
+        "joinDate": "1-Jul-25",
+        "phone": "01973457868",
+        "address": "6G, Building 5, Joynagar Govt Apartment Complex, Section 15, Mirpur, Dhaka 1216",
+        "email": "tanvirul@strategybyte.com.au",
+        "dob": "3/4/1998",
+        "designation": "Technical Project Manager",
+        "bloodGroup": "O+ve",
+        "emergencyContact": "01914942574"
+    },
+    {
+        "id": 7,
+        "name": "Sudipta Das",
+        "joinDate": "14-Oct-25",
+        "phone": "01758579417",
+        "address": "1 number C and B pol, Tiakhali road, Gaptola pol, Barishal",
+        "email": "sudipta@strategybyte.com.au",
+        "dob": "4/8/2001",
+        "designation": "Full-Stack Engineer",
+        "bloodGroup": "O+ve",
+        "emergencyContact": "01716886637"
+    },
+    {
+        "id": 8,
+        "name": "Faridul Islam Sumon",
+        "joinDate": "10-Mar-25",
+        "phone": "01673138412",
+        "address": "House#06, Road#06, Block#C, Mirpur-12, Pallabi, Dhaka-1216",
+        "email": "faridul@strategybyte.com.au",
+        "dob": "8/12/1995",
+        "designation": "Brand Design Specialist",
+        "bloodGroup": "A+",
+        "emergencyContact": "01798537048"
+    },
+    {
+        "id": 9,
+        "name": "Insharah Mahmud",
+        "joinDate": "5-Jan-26",
+        "phone": "01737976834",
+        "address": "Bashundhara R/A, Block E, Road number 8, JBS Himawari",
+        "email": "Insharah@strategybyte.com.au",
+        "dob": "31/08/2001",
+        "designation": "Intern",
+        "bloodGroup": "Ab+",
+        "emergencyContact": "01787730015"
+    }
+]

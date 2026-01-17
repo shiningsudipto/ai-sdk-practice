@@ -1,0 +1,24 @@
+{
+    "company_name": "StrategyByte",
+    "description": "StrategyByte is a results-driven digital agency focused on helping businesses grow through smart strategy, strong branding, and high-performance digital solutions. We combine data-driven insights with creative execution to build brands that stand out, connect with the right audience, and scale sustainably.",
+    "services_intro": "Our core services are designed to support businesses at every stage of growth:",
+    "services": [
+        {
+            "title": "Website Development",
+            "description": "We design and build fast, functional, and conversion-focused websites tailored to your business goals. From UI/UX design to full-stack development, our websites are optimized for performance, SEO, and user experience."
+        },
+        {
+            "title": "Strategic Brand Management",
+            "description": "We help shape, position, and manage your brand with long-term strategies that strengthen identity, improve recognition, and build trust. Our approach ensures your brand communicates consistently and stands out in competitive markets."
+        },
+        {
+            "title": "Digital Marketing & SEO",
+            "description": "We create targeted marketing campaigns backed by data and SEO best practices to increase visibility, drive qualified traffic, and improve engagement across digital channels."
+        },
+        {
+            "title": "Content Marketing",
+            "description": "We plan, create, and distribute high-value content that attracts the right audience, builds credibility, and supports long-term customer relationships. From blogs to social content, everything is aligned with your business objectives."
+        }
+    ],
+    "closing_statement": "At StrategyByte, we don’t just deliver services — we deliver holistic growth solutions. By combining strategy, creativity, and performance-focused execution, we help businesses boost their online presence, connect with customers, and achieve measurable results."
+}

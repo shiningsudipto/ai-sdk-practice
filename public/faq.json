@@ -1,0 +1,120 @@
+[
+    {
+        "title_highlight": "Marketing Agency",
+        "faqs": [
+            {
+                "value": "focus-areas",
+                "question": "What are your focus areas as a marketing agency?",
+                "answer": "We focus on digital marketing, strategic branding, UI/UX design, and business optimization to help businesses grow online."
+            },
+            {
+                "value": "what-sets-us-apart",
+                "question": "What sets StrategyByte apart from other top marketing agencies?",
+                "answer": "We deliver holistic solutions powered by strategic marketing and data-driven insights to boost visibility, engagement, and impact."
+            },
+            {
+                "value": "services-for-startups",
+                "question": "What services do you offer for start-ups, and how can they add value to my business?",
+                "answer": "We provide branding, website/app development, and marketing support to help start-ups build credibility and scale quickly."
+            },
+            {
+                "value": "redesign-help",
+                "question": "Can you help us redesign our app, website, or enterprise/B2B software?",
+                "answer": "Yes, we specialize in redesigning digital products with modern, user-friendly, and scalable UI/UX solutions."
+            },
+            {
+                "value": "time-estimation",
+                "question": "How do you estimate the time for the UI/UX project?",
+                "answer": "Timelines depend on project scope and complexity, ranging from weeks for smaller projects to months for larger ones."
+            },
+            {
+                "value": "project-cost",
+                "question": "How much does a UI/UX design project cost?",
+                "answer": "Costs vary by size, features, and customization. We provide a clear, tailored proposal after understanding your needs."
+            }
+        ]
+    },
+    {
+        "title_highlight": "Content Marketing",
+        "faqs": [
+            {
+                "question": "What is Content Marketing?",
+                "answer": "Content marketing involves creating and sharing valuable content designed to attract, engage, and retain a target audience."
+            },
+            {
+                "question": "How do I create a Content Marketing Strategy?",
+                "answer": "Start by defining your target audience and setting clear goals, choose the right content formats, distribute consistently, and track performance."
+            },
+            {
+                "question": "Why is Content Marketing Important?",
+                "answer": "It helps build long-term relationships, improves brand credibility, enhances SEO, and increases conversions."
+            },
+            {
+                "question": "What are the Benefits of Content Marketing?",
+                "answer": "It increases brand awareness, improves SEO, drives traffic, and builds a loyal audience."
+            },
+            {
+                "question": "How Does Content Marketing Improve SEO?",
+                "answer": "It improves rankings through keyword usage, longer site engagement, lower bounce rates, and backlinks."
+            },
+            {
+                "question": "What Types of Content are Used in Content Marketing?",
+                "answer": "Blogs, videos, infographics, social posts, podcasts, case studies, and eBooks."
+            }
+        ]
+    },
+    {
+        "title_highlight": "Full-Stack Website Development",
+        "faqs": [
+            {
+                "question": "How much does it cost to develop a website in Australia?",
+                "answer": "Basic sites may start from $1,500–$3,000, while custom or eCommerce sites can range from $5,000 to $20,000+."
+            },
+            {
+                "question": "How to develop a WordPress website for my business?",
+                "answer": "Plan your structure, choose a fast theme, install essential plugins, add optimized content, and set up analytics."
+            },
+            {
+                "question": "What is website development and what does it include?",
+                "answer": "It includes planning, UI/UX design, front-end and back-end development, CMS setup, SEO, testing, and optimization."
+            },
+            {
+                "question": "Where can I find a website developer in Australia?",
+                "answer": "You can find developers through agencies, freelance platforms, or business directories. StrategyByte offers end-to-end services."
+            },
+            {
+                "question": "Are website development costs tax deductible in Australia?",
+                "answer": "Yes, if the website is used for business purposes. Always consult a tax professional."
+            },
+            {
+                "question": "Can you capitalise website development costs?",
+                "answer": "Yes, long-term asset-related costs can be capitalised, while maintenance is usually expensed."
+            }
+        ]
+    },
+    {
+        "title_highlight": "Strategic Brand Management",
+        "faqs": [
+            {
+                "question": "What is Strategic Brand Management?",
+                "answer": "It involves long-term strategies to build and sustain brand identity, positioning, and customer perception."
+            },
+            {
+                "question": "Why is Brand Strategy Important?",
+                "answer": "It helps businesses differentiate, build loyalty, and ensure sustainable growth."
+            },
+            {
+                "question": "How Can I Start Building My Brand?",
+                "answer": "Define your purpose, values, audience, and ensure consistent messaging across all touchpoints."
+            },
+            {
+                "question": "What Are the Key Elements of Brand Management?",
+                "answer": "Brand positioning, identity, communication, and brand equity."
+            },
+            {
+                "question": "How Does Brand Management Impact Customer Loyalty?",
+                "answer": "Consistent value delivery builds trust, emotional connection, and repeat business."
+            }
+        ]
+    }
+]

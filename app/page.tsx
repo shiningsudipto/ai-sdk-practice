@@ -9,6 +9,8 @@ const page = () => {
       <Link href={"multi-model-chat"}>Multi Model Chat</Link>
       <Link href={"img-generate"}>Generate Image</Link>
       <Link href={"transcribe-audio"}>Transcribe Audio</Link>
+      <Link href={"sb-assistant"}>StrategyByte Assistant</Link>
+      <Link href={"voice-assistant"}>Voice Assistant</Link>
     </div>
   );
 };
