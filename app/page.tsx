@@ -11,6 +11,7 @@ const page = () => {
       <Link href={"transcribe-audio"}>Transcribe Audio</Link>
       <Link href={"sb-assistant"}>StrategyByte Assistant</Link>
       <Link href={"voice-assistant"}>Voice Assistant</Link>
+      <Link href={"booking"}>Booking</Link>
     </div>
   );
 };

@@ -4,10 +4,22 @@ import next from "next";
 import { WebSocketServer, WebSocket } from "ws";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { MongoClient } from "mongodb";
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
 const handle = app.getRequestHandler();
+
+// MongoDB connection
+let mongoClient: MongoClient | null = null;
+
+async function getMongoDb() {
+  if (!mongoClient) {
+    mongoClient = new MongoClient(process.env.DATABASE_URL!);
+    await mongoClient.connect();
+  }
+  return mongoClient.db();
+}
 
 // Load data from JSON files
 const employees = JSON.parse(
@@ -125,10 +137,34 @@ const tools = [
       required: ["category"],
     },
   },
+  {
+    type: "function",
+    name: "createBooking",
+    description:
+      "Create a new booking/appointment for a user. Use this when user wants to schedule or book a meeting/consultation.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "The full name of the person making the booking",
+        },
+        email: {
+          type: "string",
+          description: "The email address of the person",
+        },
+        phone: {
+          type: "string",
+          description: "The phone number of the person",
+        },
+      },
+      required: ["name", "email", "phone"],
+    },
+  },
 ];
 
 // Tool execution handlers
-function executeTool(name: string, args: Record<string, string>) {
+async function executeTool(name: string, args: Record<string, string>) {
   switch (name) {
     case "getEmployeeByName": {
       const searchTerm = args.name.toLowerCase();
@@ -255,6 +291,43 @@ function executeTool(name: string, args: Record<string, string>) {
       };
     }
 
+    case "createBooking": {
+      try {
+        const { name, email, phone } = args;
+        if (!name || !email || !phone) {
+          return {
+            success: false,
+            message:
+              "Missing required fields: name, email, and phone are required",
+          };
+        }
+
+        const db = await getMongoDb();
+        const collection = db.collection("bookings");
+
+        const booking = {
+          name,
+          email,
+          phone,
+          createdAt: new Date(),
+        };
+
+        const result = await collection.insertOne(booking);
+
+        return {
+          success: true,
+          message: `Booking created successfully for ${name}. We will contact you at ${email} or ${phone}.`,
+          bookingId: result.insertedId.toString(),
+        };
+      } catch (error) {
+        console.error("Error creating booking:", error);
+        return {
+          success: false,
+          message: "Failed to create booking. Please try again.",
+        };
+      }
+    }
+
     default:
       return { success: false, message: `Unknown tool: ${name}` };
   }
@@ -300,11 +373,13 @@ app.prepare().then(() => {
           type: "session.update",
           session: {
             modalities: ["text", "audio"],
-            instructions: `You are Sukuna, the voice assistant for StrategyByte (SB), a digital agency. Always speak in English.
-You have access to tools for employee information, company info, services, and FAQs.
-Use the appropriate tool to answer questions about StrategyByte.
-Keep responses brief and conversational for voice.
-Introduce yourself as Sukuna when greeted.`,
+            instructions: `
+            - You are Sukuna, the voice assistant for StrategyByte (SB), a digital agency.
+- You have access to tools for employee information, company info, services, FAQs, and booking appointments.
+- Use the appropriate tool to answer questions about StrategyByte.
+- When a user wants to schedule or book a meeting/consultation, use the createBooking tool and ask for their name, email, and phone number.
+- Keep responses brief and conversational for voice.
+- Introduce yourself as Sukuna when greeted.`,
             voice: "alloy",
             input_audio_format: "pcm16",
             output_audio_format: "pcm16",
@@ -354,32 +429,34 @@ Introduce yourself as Sukuna when greeted.`,
           const { call_id, name, arguments: argsString } = msg;
           console.log(`Tool call: ${name}`, argsString);
 
-          try {
-            const args = JSON.parse(argsString);
-            const result = executeTool(name, args);
-            console.log(`Tool result:`, result);
+          (async () => {
+            try {
+              const args = JSON.parse(argsString);
+              const result = await executeTool(name, args);
+              console.log(`Tool result:`, result);
 
-            // Send the tool result back to OpenAI
-            openaiWs.send(
-              JSON.stringify({
-                type: "conversation.item.create",
-                item: {
-                  type: "function_call_output",
-                  call_id: call_id,
-                  output: JSON.stringify(result),
-                },
-              }),
-            );
+              // Send the tool result back to OpenAI
+              openaiWs.send(
+                JSON.stringify({
+                  type: "conversation.item.create",
+                  item: {
+                    type: "function_call_output",
+                    call_id: call_id,
+                    output: JSON.stringify(result),
+                  },
+                }),
+              );
 
-            // Request the AI to continue responding
-            openaiWs.send(
-              JSON.stringify({
-                type: "response.create",
-              }),
-            );
-          } catch (e) {
-            console.error("Error executing tool:", e);
-          }
+              // Request the AI to continue responding
+              openaiWs.send(
+                JSON.stringify({
+                  type: "response.create",
+                }),
+              );
+            } catch (e) {
+              console.error("Error executing tool:", e);
+            }
+          })();
         }
 
         if (msg.type === "response.done") {
