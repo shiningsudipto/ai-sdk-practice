@@ -11,13 +11,13 @@ const handle = app.getRequestHandler();
 
 // Load data from JSON files
 const employees = JSON.parse(
-  readFileSync(join(process.cwd(), "public", "employee.json"), "utf-8")
+  readFileSync(join(process.cwd(), "public", "employee.json"), "utf-8"),
 );
 const aboutData = JSON.parse(
-  readFileSync(join(process.cwd(), "public", "about.json"), "utf-8")
+  readFileSync(join(process.cwd(), "public", "about.json"), "utf-8"),
 );
 const faqData = JSON.parse(
-  readFileSync(join(process.cwd(), "public", "faq.json"), "utf-8")
+  readFileSync(join(process.cwd(), "public", "faq.json"), "utf-8"),
 );
 
 // Define tools for OpenAI Realtime API
@@ -133,10 +133,13 @@ function executeTool(name: string, args: Record<string, string>) {
     case "getEmployeeByName": {
       const searchTerm = args.name.toLowerCase();
       const found = employees.filter((emp: { name: string }) =>
-        emp.name.toLowerCase().includes(searchTerm)
+        emp.name.toLowerCase().includes(searchTerm),
       );
       if (found.length === 0) {
-        return { success: false, message: `No employee found matching "${args.name}"` };
+        return {
+          success: false,
+          message: `No employee found matching "${args.name}"`,
+        };
       }
       return { success: true, employees: found };
     }
@@ -144,20 +147,25 @@ function executeTool(name: string, args: Record<string, string>) {
     case "getEmployeeByDesignation": {
       const searchTerm = args.designation.toLowerCase();
       const found = employees.filter((emp: { designation: string }) =>
-        emp.designation.toLowerCase().includes(searchTerm)
+        emp.designation.toLowerCase().includes(searchTerm),
       );
       if (found.length === 0) {
-        return { success: false, message: `No employees found with designation "${args.designation}"` };
+        return {
+          success: false,
+          message: `No employees found with designation "${args.designation}"`,
+        };
       }
       return { success: true, count: found.length, employees: found };
     }
 
     case "getAllEmployees": {
-      const summary = employees.map((emp: { name: string; designation: string; email: string }) => ({
-        name: emp.name,
-        designation: emp.designation,
-        email: emp.email,
-      }));
+      const summary = employees.map(
+        (emp: { name: string; designation: string; email: string }) => ({
+          name: emp.name,
+          designation: emp.designation,
+          email: emp.email,
+        }),
+      );
       return { success: true, count: employees.length, employees: summary };
     }
 
@@ -176,10 +184,13 @@ function executeTool(name: string, args: Record<string, string>) {
         const found = aboutData.services.filter(
           (service: { title: string; description: string }) =>
             service.title.toLowerCase().includes(searchTerm) ||
-            service.description.toLowerCase().includes(searchTerm)
+            service.description.toLowerCase().includes(searchTerm),
         );
         if (found.length === 0) {
-          return { success: false, message: `No service found matching "${args.serviceName}"` };
+          return {
+            success: false,
+            message: `No service found matching "${args.serviceName}"`,
+          };
         }
         return { success: true, services: found };
       }
@@ -192,23 +203,32 @@ function executeTool(name: string, args: Record<string, string>) {
 
     case "searchFAQ": {
       const searchTerm = args.query.toLowerCase();
-      const results: { category: string; question: string; answer: string }[] = [];
-      faqData.forEach((category: { title_highlight: string; faqs: { question: string; answer: string }[] }) => {
-        category.faqs.forEach((faq) => {
-          if (
-            faq.question.toLowerCase().includes(searchTerm) ||
-            faq.answer.toLowerCase().includes(searchTerm)
-          ) {
-            results.push({
-              category: category.title_highlight,
-              question: faq.question,
-              answer: faq.answer,
-            });
-          }
-        });
-      });
+      const results: { category: string; question: string; answer: string }[] =
+        [];
+      faqData.forEach(
+        (category: {
+          title_highlight: string;
+          faqs: { question: string; answer: string }[];
+        }) => {
+          category.faqs.forEach((faq) => {
+            if (
+              faq.question.toLowerCase().includes(searchTerm) ||
+              faq.answer.toLowerCase().includes(searchTerm)
+            ) {
+              results.push({
+                category: category.title_highlight,
+                question: faq.question,
+                answer: faq.answer,
+              });
+            }
+          });
+        },
+      );
       if (results.length === 0) {
-        return { success: false, message: `No FAQs found matching "${args.query}"` };
+        return {
+          success: false,
+          message: `No FAQs found matching "${args.query}"`,
+        };
       }
       return { success: true, count: results.length, faqs: results };
     }
@@ -216,10 +236,12 @@ function executeTool(name: string, args: Record<string, string>) {
     case "getFAQsByCategory": {
       const searchTerm = args.category.toLowerCase();
       const found = faqData.find((cat: { title_highlight: string }) =>
-        cat.title_highlight.toLowerCase().includes(searchTerm)
+        cat.title_highlight.toLowerCase().includes(searchTerm),
       );
       if (!found) {
-        const categories = faqData.map((cat: { title_highlight: string }) => cat.title_highlight);
+        const categories = faqData.map(
+          (cat: { title_highlight: string }) => cat.title_highlight,
+        );
         return {
           success: false,
           message: `Category not found. Available: ${categories.join(", ")}`,
@@ -278,7 +300,7 @@ app.prepare().then(() => {
           type: "session.update",
           session: {
             modalities: ["text", "audio"],
-            instructions: `You are Sukuna, the voice assistant for StrategyByte (SB), a digital agency.
+            instructions: `You are Sukuna, the voice assistant for StrategyByte (SB), a digital agency. Always speak in English.
 You have access to tools for employee information, company info, services, and FAQs.
 Use the appropriate tool to answer questions about StrategyByte.
 Keep responses brief and conversational for voice.
@@ -346,14 +368,14 @@ Introduce yourself as Sukuna when greeted.`,
                   call_id: call_id,
                   output: JSON.stringify(result),
                 },
-              })
+              }),
             );
 
             // Request the AI to continue responding
             openaiWs.send(
               JSON.stringify({
                 type: "response.create",
-              })
+              }),
             );
           } catch (e) {
             console.error("Error executing tool:", e);

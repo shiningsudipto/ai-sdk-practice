@@ -302,29 +302,6 @@ export default function VoiceAssistantPage() {
             </button>
           )}
         </div>
-
-        {/* Instructions */}
-        <div className="mt-8 p-4 bg-gray-100 rounded-lg text-sm text-gray-600">
-          <h3 className="font-semibold mb-2">How to use:</h3>
-          <ol className="list-decimal list-inside space-y-1">
-            <li>Click "Start Assistant" to connect</li>
-            <li>Allow microphone access when prompted</li>
-            <li>Start speaking naturally</li>
-            <li>The AI will respond with voice</li>
-          </ol>
-        </div>
-
-        {/* Note about custom server */}
-        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-          <p className="font-semibold">Note:</p>
-          <p>
-            Run{" "}
-            <code className="bg-yellow-100 px-1 rounded">npm run dev:ws</code>{" "}
-            instead of{" "}
-            <code className="bg-yellow-100 px-1 rounded">npm run dev</code> to
-            enable WebSocket support.
-          </p>
-        </div>
       </div>
     </div>
   );

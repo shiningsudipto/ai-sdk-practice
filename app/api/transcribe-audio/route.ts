@@ -1,7 +1,7 @@
 import { openai } from "@ai-sdk/openai";
 import { experimental_transcribe as transcribe } from "ai";
 
-export async function POST(req: Response) {
+export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const audioFile = formData.get("audio") as File;
