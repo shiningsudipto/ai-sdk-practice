@@ -6,6 +6,7 @@ const page = () => {
       <Link href={"text-generate"}>Generate text</Link>
       <Link href={"text-generate/stream"}>Stream: Generate text</Link>
       <Link href={"chat"}>Chat</Link>
+      <Link href={"multi-model-chat "}>Multi Model Chat</Link>
     </div>
   );
 };
