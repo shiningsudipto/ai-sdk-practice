@@ -8,6 +8,7 @@ const page = () => {
       <Link href={"chat"}>Chat</Link>
       <Link href={"multi-model-chat"}>Multi Model Chat</Link>
       <Link href={"img-generate"}>Generate Image</Link>
+      <Link href={"transcribe-audio"}>Transcribe Audio</Link>
     </div>
   );
 };
