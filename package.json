@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:ws": "npx tsx server.ts",
     "build": "next build",
     "start": "next start",
+    "start:ws": "NODE_ENV=production npx tsx server.ts",
     "lint": "eslint"
   },
   "dependencies": {
@@ -20,6 +22,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.4.0",
+    "ws": "^8.19.0",
     "zod": "^4.3.5"
   },
   "devDependencies": {
@@ -27,6 +30,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.2",
     "tailwindcss": "^4",
