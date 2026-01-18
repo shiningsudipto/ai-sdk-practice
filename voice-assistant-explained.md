@@ -1,6 +1,6 @@
-# Voice Assistant - Code Explanation Guide
+# Voice Assistant - Complete Implementation Guide
 
-This guide explains how the real-time voice assistant works, breaking down both the server-side WebSocket relay and the client-side audio handling.
+This guide explains the StrategyByte voice assistant implementation, covering the WebSocket relay server, client-side audio handling, and tool integration.
 
 ---
 
@@ -9,81 +9,189 @@ This guide explains how the real-time voice assistant works, breaking down both 
 ```
 ┌──────────────────────┐      ┌────────────────────┐      ┌─────────────────────┐
 │      Browser         │      │   Custom Server    │      │  OpenAI Realtime    │
-│  (page.tsx)          │      │   (server.ts)      │      │       API           │
+│  (voice-assistant)   │      │   (server.ts)      │      │       API           │
 │                      │      │                    │      │                     │
-│  ┌────────────────┐  │      │                    │      │                     │
-│  │ Microphone     │──┼──────┼──► Relay ──────────┼──────┼──►                  │
-│  │ (PCM16 Audio)  │  │  WS  │                    │  WS  │                     │
-│  └────────────────┘  │      │                    │      │                     │
-│                      │      │                    │      │                     │
-│  ┌────────────────┐  │      │                    │      │                     │
-│  │ Speaker        │◄─┼──────┼──◄ Relay ◄─────────┼──────┼──◄                  │
-│  │ (Audio Output) │  │      │                    │      │                     │
-│  └────────────────┘  │      │                    │      │                     │
-└──────────────────────┘      └────────────────────┘      └─────────────────────┘
+│  ┌────────────────┐  │      │  ┌──────────────┐  │      │                     │
+│  │ Microphone     │──┼──────┼─►│    Relay     │──┼──────┼──►                  │
+│  │ (PCM16 Audio)  │  │  WS  │  │              │  │  WS  │                     │
+│  └────────────────┘  │      │  │  ┌────────┐  │  │      │                     │
+│                      │      │  │  │ Tools  │  │  │      │                     │
+│  ┌────────────────┐  │      │  │  └────────┘  │  │      │                     │
+│  │ Speaker        │◄─┼──────┼─◄│              │◄─┼──────┼──◄                  │
+│  │ (Audio Output) │  │      │  └──────────────┘  │      │                     │
+│  └────────────────┘  │      │         │          │      │                     │
+└──────────────────────┘      │    ┌────▼────┐     │      └─────────────────────┘
+                              │    │ MongoDB │     │
+                              │    └─────────┘     │
+                              └────────────────────┘
 ```
 
 **Why a relay server?**
 - OpenAI Realtime API requires an API key in headers
 - Browser WebSocket cannot set custom headers
 - Server acts as a secure proxy, hiding the API key
+- Server can execute tools (database operations, file reads)
 
 ---
 
 ## Part 1: Server-Side (server.ts)
 
-### 1.1 Why Custom Server?
-
-Next.js App Router doesn't support WebSocket upgrades natively. We need a custom HTTP server that can:
-1. Handle normal HTTP requests (Next.js pages)
-2. Handle WebSocket upgrade requests
-
-### 1.2 Server Setup (Lines 1-13)
+### 1.1 Imports and Setup
 
 ```ts
 import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { WebSocketServer, WebSocket } from "ws";
+import { readFileSync } from "fs";
+import { join } from "path";
+import { MongoClient } from "mongodb";
+```
 
-const dev = process.env.NODE_ENV !== "production";
-const app = next({ dev });
-const handle = app.getRequestHandler();
+**Dependencies:**
+- `http` - Create HTTP server
+- `url` - Parse request URLs
+- `next` - Next.js framework
+- `ws` - WebSocket library
+- `fs` - Read JSON files
+- `mongodb` - Database for bookings
 
+### 1.2 Database Connection
+
+```ts
+let mongoClient: MongoClient | null = null;
+
+async function getMongoDb() {
+  if (!mongoClient) {
+    mongoClient = new MongoClient(process.env.DATABASE_URL!);
+    await mongoClient.connect();
+  }
+  return mongoClient.db();
+}
+```
+
+**What's happening:**
+- Lazy connection - only connects when needed
+- Connection caching - reuses existing connection
+- Uses `DATABASE_URL` from environment variables
+
+### 1.3 Loading Static Data
+
+```ts
+const employees = JSON.parse(
+  readFileSync(join(process.cwd(), "public", "employee.json"), "utf-8")
+);
+const aboutData = JSON.parse(
+  readFileSync(join(process.cwd(), "public", "about.json"), "utf-8")
+);
+const faqData = JSON.parse(
+  readFileSync(join(process.cwd(), "public", "faq.json"), "utf-8")
+);
+```
+
+**What's happening:**
+- Reads JSON files at server startup
+- Data is kept in memory for fast tool execution
+- Files are in `public/` directory
+
+### 1.4 Tool Definitions
+
+OpenAI Realtime API uses JSON Schema format for tools:
+
+```ts
+const tools = [
+  {
+    type: "function",
+    name: "getEmployeeByName",
+    description: "Search for an employee by name...",
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "The name or partial name of the employee",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  // ... more tools
+];
+```
+
+**Available Tools:**
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `getEmployeeByName` | Search employee by name | `name: string` |
+| `getEmployeeByDesignation` | Filter by job role | `designation: string` |
+| `getAllEmployees` | List all employees | none |
+| `getCompanyInfo` | Company description & mission | none |
+| `getServices` | List/filter services | `serviceName?: string` |
+| `searchFAQ` | Search FAQs by keyword | `query: string` |
+| `getFAQsByCategory` | Get FAQs by category | `category: string` |
+| `createBooking` | Create appointment | `name, email, phone` |
+
+### 1.5 Tool Execution Handler
+
+```ts
+async function executeTool(name: string, args: Record<string, string>) {
+  switch (name) {
+    case "getEmployeeByName": {
+      const searchTerm = args.name.toLowerCase();
+      const found = employees.filter((emp) =>
+        emp.name.toLowerCase().includes(searchTerm)
+      );
+      if (found.length === 0) {
+        return { success: false, message: `No employee found...` };
+      }
+      return { success: true, employees: found };
+    }
+
+    case "createBooking": {
+      const { name, email, phone } = args;
+      const db = await getMongoDb();
+      const collection = db.collection("bookings");
+
+      const booking = { name, email, phone, createdAt: new Date() };
+      const result = await collection.insertOne(booking);
+
+      return {
+        success: true,
+        message: `Booking created successfully for ${name}...`,
+        bookingId: result.insertedId.toString(),
+      };
+    }
+    // ... other cases
+  }
+}
+```
+
+**Key Points:**
+- `async` function - supports database operations
+- Returns structured JSON response
+- Each tool has success/failure handling
+
+### 1.6 WebSocket Server Setup
+
+```ts
 app.prepare().then(() => {
   const server = createServer((req, res) => {
     handle(req, res, parse(req.url!, true));
   });
+
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on("upgrade", (req, socket, head) => {
+    const { pathname } = parse(req.url!, true);
+
+    if (pathname === "/api/realtime") {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        handleRealtimeConnection(ws);
+      });
+    }
+  });
 ```
-
-**What's happening:**
-1. `next({ dev })` - Initialize Next.js app
-2. `app.prepare()` - Wait for Next.js to compile
-3. `createServer()` - Create HTTP server
-4. `handle(req, res, ...)` - Let Next.js handle all HTTP requests
-
-### 1.3 WebSocket Server Setup (Lines 15-25)
-
-```ts
-const wss = new WebSocketServer({ noServer: true });
-
-server.on("upgrade", (req, socket, head) => {
-  const { pathname } = parse(req.url!, true);
-
-  if (pathname === "/api/realtime") {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      handleRealtimeConnection(ws);
-    });
-  }
-});
-```
-
-**What's happening:**
-1. `noServer: true` - WebSocket server won't listen on its own port
-2. `server.on("upgrade")` - Listen for WebSocket upgrade requests
-3. Only handle upgrades to `/api/realtime` path
-4. `handleUpgrade()` - Complete the WebSocket handshake
-5. Call `handleRealtimeConnection()` with the new WebSocket
 
 **HTTP Upgrade Process:**
 ```
@@ -98,12 +206,10 @@ Upgrade: websocket
 Connection: Upgrade
 ```
 
-### 1.4 Connecting to OpenAI (Lines 27-39)
+### 1.7 OpenAI Connection & Session Config
 
 ```ts
 function handleRealtimeConnection(clientWs: WebSocket) {
-  console.log("Client connected to realtime");
-
   const openaiWs = new WebSocket(
     "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview",
     {
@@ -111,28 +217,15 @@ function handleRealtimeConnection(clientWs: WebSocket) {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "OpenAI-Beta": "realtime=v1",
       },
-    },
+    }
   );
-```
 
-**What's happening:**
-1. When browser connects, immediately connect to OpenAI
-2. Pass API key in Authorization header (hidden from browser)
-3. `OpenAI-Beta` header required for Realtime API access
-4. Now we have two WebSocket connections to manage
-
-### 1.5 Session Configuration (Lines 41-64)
-
-```ts
-openaiWs.on("open", () => {
-  console.log("Connected to OpenAI Realtime API");
-
-  openaiWs.send(
-    JSON.stringify({
+  openaiWs.on("open", () => {
+    openaiWs.send(JSON.stringify({
       type: "session.update",
       session: {
         modalities: ["text", "audio"],
-        instructions: "You are a helpful voice assistant. Keep responses brief.",
+        instructions: `You are Sukuna, the voice assistant for StrategyByte...`,
         voice: "alloy",
         input_audio_format: "pcm16",
         output_audio_format: "pcm16",
@@ -142,80 +235,98 @@ openaiWs.on("open", () => {
           prefix_padding_ms: 300,
           silence_duration_ms: 1000,
         },
+        tools: tools,
       },
-    }),
-  );
-});
+    }));
+  });
+}
 ```
 
-**Session Configuration Explained:**
+**Session Configuration:**
 
 | Property | Value | Description |
 |----------|-------|-------------|
-| `modalities` | `["text", "audio"]` | AI can respond with both text and audio |
+| `modalities` | `["text", "audio"]` | AI can respond with both |
 | `instructions` | string | System prompt for the AI |
-| `voice` | `"alloy"` | Voice style (options: alloy, echo, fable, onyx, nova, shimmer) |
-| `input_audio_format` | `"pcm16"` | Audio format we send (16-bit PCM) |
-| `output_audio_format` | `"pcm16"` | Audio format AI sends back |
+| `voice` | `"alloy"` | Voice style |
+| `input_audio_format` | `"pcm16"` | 16-bit PCM audio input |
+| `output_audio_format` | `"pcm16"` | 16-bit PCM audio output |
 | `turn_detection.type` | `"server_vad"` | Server-side Voice Activity Detection |
-| `turn_detection.threshold` | `0.6` | Sensitivity (0.0-1.0, higher = less sensitive) |
-| `turn_detection.prefix_padding_ms` | `300` | Audio to keep before speech detected |
-| `turn_detection.silence_duration_ms` | `1000` | Wait time after silence before processing |
+| `turn_detection.threshold` | `0.6` | Sensitivity (0-1) |
+| `turn_detection.silence_duration_ms` | `1000` | Wait time after silence |
+| `tools` | array | Available function tools |
 
-### 1.6 Message Relay (Lines 70-111)
+### 1.8 Message Relay & Tool Call Handling
 
 ```ts
-// Relay messages: Client → OpenAI
+// Relay: Client → OpenAI
 clientWs.on("message", (data) => {
-  try {
-    const message = JSON.parse(data.toString());
-    if (openaiWs.readyState === WebSocket.OPEN) {
-      openaiWs.send(JSON.stringify(message));
-    }
-  } catch (e) {
-    console.error("Error parsing client message:", e);
+  const message = JSON.parse(data.toString());
+  if (openaiWs.readyState === WebSocket.OPEN) {
+    openaiWs.send(JSON.stringify(message));
   }
 });
 
-// Relay messages: OpenAI → Client
+// Relay: OpenAI → Client (with tool handling)
 openaiWs.on("message", (data) => {
   const responseString = data.toString();
+
+  // Always relay to client
   if (clientWs.readyState === WebSocket.OPEN) {
     clientWs.send(responseString);
   }
-  // ... logging
+
+  const msg = JSON.parse(responseString);
+
+  // Handle tool calls
+  if (msg.type === "response.function_call_arguments.done") {
+    const { call_id, name, arguments: argsString } = msg;
+
+    (async () => {
+      const args = JSON.parse(argsString);
+      const result = await executeTool(name, args);
+
+      // Send tool result back to OpenAI
+      openaiWs.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "function_call_output",
+          call_id: call_id,
+          output: JSON.stringify(result),
+        },
+      }));
+
+      // Continue the conversation
+      openaiWs.send(JSON.stringify({
+        type: "response.create",
+      }));
+    })();
+  }
 });
 ```
 
-**What's happening:**
-1. Browser sends audio → Server receives → Server forwards to OpenAI
-2. OpenAI sends response → Server receives → Server forwards to Browser
-3. Check `readyState === WebSocket.OPEN` before sending (connection might be closed)
-
-### 1.7 Connection Cleanup (Lines 113-135)
-
-```ts
-clientWs.on("close", () => {
-  console.log("Client disconnected");
-  if (openaiWs.readyState === WebSocket.OPEN) openaiWs.close();
-});
-
-openaiWs.on("close", (code, reason) => {
-  console.log(`OpenAI connection closed - Code: ${code}, Reason: ${reason}`);
-  if (clientWs.readyState === WebSocket.OPEN) clientWs.close();
-});
+**Tool Call Flow:**
 ```
-
-**What's happening:**
-- If browser disconnects → close OpenAI connection
-- If OpenAI disconnects → close browser connection
-- Prevents zombie connections
+1. User asks: "Who is the CTO?"
+        ↓
+2. OpenAI decides to call tool: getEmployeeByDesignation
+        ↓
+3. Server receives: response.function_call_arguments.done
+        ↓
+4. Server executes: executeTool("getEmployeeByDesignation", {designation: "CTO"})
+        ↓
+5. Server sends result: conversation.item.create (function_call_output)
+        ↓
+6. Server requests continuation: response.create
+        ↓
+7. OpenAI generates voice response with the data
+```
 
 ---
 
-## Part 2: Client-Side (page.tsx)
+## Part 2: Client-Side (voice-assistant/page.tsx)
 
-### 2.1 State Management (Lines 6-14)
+### 2.1 State Management
 
 ```tsx
 const [isConnected, setIsConnected] = useState(false);
@@ -227,55 +338,43 @@ const audioContextRef = useRef<AudioContext | null>(null);
 const streamRef = useRef<MediaStream | null>(null);
 const processorRef = useRef<ScriptProcessorNode | null>(null);
 const audioQueueRef = useRef<AudioBufferSourceNode[]>([]);
+const nextStartTimeRef = useRef<number>(0);
 ```
 
-**Why useRef instead of useState?**
-- `useRef` doesn't trigger re-renders
-- Audio objects need stable references
-- WebSocket connection should persist across renders
+**Why useRef?**
+- Audio objects need stable references across renders
+- WebSocket connection should persist
+- No re-renders needed for these values
 
-| Ref | Purpose |
-|-----|---------|
-| `wsRef` | WebSocket connection to server |
-| `audioContextRef` | Web Audio API context |
-| `streamRef` | Microphone MediaStream |
-| `processorRef` | Audio processor node |
-| `audioQueueRef` | Queue of audio sources for playback |
-
-### 2.2 Starting the Assistant (Lines 17-66)
+### 2.2 Starting the Assistant
 
 ```tsx
 const startAssistant = useCallback(async () => {
-  try {
-    // 1. Get microphone access
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        sampleRate: 24000,
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
-    });
-    streamRef.current = stream;
+  // 1. Get microphone access
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      sampleRate: 24000,
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+    },
+  });
 
-    // 2. Setup audio context
-    const audioContext = new AudioContext({ sampleRate: 24000 });
-    audioContextRef.current = audioContext;
+  // 2. Setup audio context
+  const audioContext = new AudioContext({ sampleRate: 24000 });
 
-    // 3. Connect to WebSocket
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/realtime`);
-    wsRef.current = ws;
+  // 3. Connect to WebSocket
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(`${protocol}//${window.location.host}/api/realtime`);
 
-    ws.onopen = () => {
-      setIsConnected(true);
-      setStatus("Connected - Start speaking");
-      startAudioCapture(stream, audioContext, ws);
-    };
-    // ... event handlers
-  } catch (error) {
-    setStatus("Failed to access microphone");
-  }
+  ws.onopen = () => {
+    setIsConnected(true);
+    startAudioCapture(stream, audioContext, ws);
+  };
+
+  ws.onmessage = (event) => {
+    handleServerMessage(event.data);
+  };
 }, []);
 ```
 
@@ -283,38 +382,31 @@ const startAssistant = useCallback(async () => {
 ```
 1. Request microphone permission
         ↓
-2. Create AudioContext (24kHz sample rate)
+2. Create AudioContext (24kHz)
         ↓
 3. Connect WebSocket to /api/realtime
         ↓
-4. On connection open → start audio capture
+4. On connection → start audio capture
 ```
 
-**Audio Settings Explained:**
-- `sampleRate: 24000` - OpenAI Realtime requires 24kHz
-- `channelCount: 1` - Mono audio (required)
-- `echoCancellation: true` - Prevent feedback loops
-- `noiseSuppression: true` - Reduce background noise
-
-### 2.3 Audio Format Conversion (Lines 68-88)
+### 2.3 Audio Format Conversion
 
 ```tsx
-// Convert Float32 (Web Audio) to Int16 (PCM16)
+// Web Audio (Float32) → OpenAI (PCM16)
 const floatTo16BitPCM = (float32Array: Float32Array) => {
   const buffer = new ArrayBuffer(float32Array.length * 2);
   const view = new DataView(buffer);
-  let offset = 0;
-  for (let i = 0; i < float32Array.length; i++, offset += 2) {
+  for (let i = 0; i < float32Array.length; i++) {
     const s = Math.max(-1, Math.min(1, float32Array[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
   return buffer;
 };
 
-// Convert ArrayBuffer to Base64 string
+// Binary → Base64 for JSON transport
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-  let binary = "";
   const bytes = new Uint8Array(buffer);
+  let binary = "";
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
@@ -322,33 +414,19 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
 };
 ```
 
-**Audio Format Pipeline:**
+**Conversion Pipeline:**
 ```
-Microphone Output     Conversion           JSON Transport
-─────────────────    ───────────────      ──────────────
-Float32 (-1 to 1) → Int16 (-32768 to 32767) → Base64 string
+Microphone      Conversion           JSON Transport
+─────────────  ───────────────      ──────────────
+Float32 (-1,1) → Int16 (-32768,32767) → Base64 string
 ```
 
-**Why this conversion?**
-1. Web Audio API uses Float32 (-1.0 to 1.0)
-2. OpenAI requires PCM16 (-32768 to 32767)
-3. WebSocket JSON needs Base64 encoding for binary data
-
-### 2.4 Capturing & Sending Audio (Lines 103-136)
+### 2.4 Audio Capture & Sending
 
 ```tsx
-const startAudioCapture = async (
-  stream: MediaStream,
-  audioContext: AudioContext,
-  ws: WebSocket,
-) => {
-  if (audioContext.state === "suspended") {
-    await audioContext.resume();
-  }
-
+const startAudioCapture = async (stream, audioContext, ws) => {
   const source = audioContext.createMediaStreamSource(stream);
   const processor = audioContext.createScriptProcessor(4096, 1, 1);
-  processorRef.current = processor;
 
   source.connect(processor);
   processor.connect(audioContext.destination);
@@ -360,249 +438,247 @@ const startAudioCapture = async (
     const pcm16Buffer = floatTo16BitPCM(inputData);
     const base64Audio = arrayBufferToBase64(pcm16Buffer);
 
-    ws.send(
-      JSON.stringify({
-        type: "input_audio_buffer.append",
-        audio: base64Audio,
-      }),
-    );
+    ws.send(JSON.stringify({
+      type: "input_audio_buffer.append",
+      audio: base64Audio,
+    }));
   };
-
-  setIsListening(true);
 };
 ```
 
 **Audio Processing Chain:**
 ```
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌───────────┐
-│ Microphone  │───►│ MediaStream  │───►│ ScriptProc  │───►│ WebSocket │
-│             │    │   Source     │    │  (4096 buf) │    │   Send    │
-└─────────────┘    └──────────────┘    └─────────────┘    └───────────┘
+Microphone → MediaStreamSource → ScriptProcessor → WebSocket
+                                  (4096 samples)
 ```
 
-**Buffer Size (4096):**
-- Smaller = lower latency, more CPU
-- Larger = higher latency, less CPU
-- 4096 is a good balance
-
-**Message Format Sent:**
-```json
-{
-  "type": "input_audio_buffer.append",
-  "audio": "base64EncodedPCM16Data..."
-}
-```
-
-### 2.5 Handling Server Messages (Lines 138-188)
+### 2.5 Handling Server Messages
 
 ```tsx
 const handleServerMessage = (data: string) => {
-  try {
-    const message = JSON.parse(data);
+  const message = JSON.parse(data);
 
-    switch (message.type) {
-      case "session.created":
-        console.log("Session created");
-        break;
+  switch (message.type) {
+    case "session.created":
+    case "session.updated":
+      console.log(message.type);
+      break;
 
-      case "session.updated":
-        console.log("Session updated");
-        break;
+    case "response.audio.delta":
+      playAudioChunk(message.delta);
+      break;
 
-      case "response.audio.delta":
-        playAudioChunk(message.delta);
-        break;
+    case "input_audio_buffer.speech_started":
+      setStatus("Listening...");
+      stopAudioPlayback(); // Interrupt AI when user speaks
+      break;
 
-      case "response.audio.done":
-        setStatus("Response complete - Continue speaking");
-        break;
+    case "input_audio_buffer.speech_stopped":
+      setStatus("Processing...");
+      break;
 
-      case "input_audio_buffer.speech_started":
-        setStatus("Listening...");
-        stopAudioPlayback();  // Stop AI audio when user starts speaking
-        break;
+    case "response.created":
+      setStatus("AI is responding...");
+      break;
 
-      case "input_audio_buffer.speech_stopped":
-        setStatus("Processing...");
-        break;
+    case "response.audio.done":
+      setStatus("Response complete - Continue speaking");
+      break;
 
-      case "response.created":
-        setStatus("AI is responding...");
-        break;
-
-      case "error":
-        setStatus(`Error: ${message.error?.message}`);
-        break;
-    }
-  } catch {
-    // Binary data - ignore
+    case "error":
+      setStatus(`Error: ${message.error?.message}`);
+      break;
   }
 };
 ```
 
-**Message Types from OpenAI:**
+**Message Types:**
 
-| Message Type | When Received | Action |
-|--------------|---------------|--------|
-| `session.created` | After connecting | Log confirmation |
-| `session.updated` | After session.update sent | Log confirmation |
-| `input_audio_buffer.speech_started` | User starts speaking | Update UI, stop AI audio |
-| `input_audio_buffer.speech_stopped` | User stops speaking | Update UI |
-| `response.created` | AI starts generating | Update UI |
+| Type | When | Action |
+|------|------|--------|
+| `session.created` | After connecting | Log |
+| `session.updated` | After config sent | Log |
+| `input_audio_buffer.speech_started` | User starts speaking | Stop AI audio |
+| `input_audio_buffer.speech_stopped` | User stops speaking | Show "Processing" |
+| `response.created` | AI starts responding | Show "Responding" |
 | `response.audio.delta` | Audio chunk ready | Play audio |
-| `response.audio.done` | Response complete | Update UI |
-| `error` | Something went wrong | Show error |
+| `response.audio.done` | Response complete | Update status |
+| `error` | Something wrong | Show error |
 
-### 2.6 Playing Audio Response (Lines 192-241)
+### 2.6 Playing Audio Response
 
 ```tsx
-const nextStartTimeRef = useRef<number>(0);
-
 const playAudioChunk = (base64Audio: string) => {
-  if (!audioContextRef.current) return;
-
   const audioContext = audioContextRef.current;
-  if (audioContext.state === "suspended") {
-    audioContext.resume();
+
+  // Decode base64 → PCM16 → Float32
+  const binaryString = atob(base64Audio);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const pcm16 = new Int16Array(bytes.buffer);
+
+  const float32 = new Float32Array(pcm16.length);
+  for (let i = 0; i < pcm16.length; i++) {
+    float32[i] = pcm16[i] / 0x7fff;
   }
 
-  try {
-    // Decode base64 to PCM
-    const binaryString = atob(base64Audio);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
+  // Create and schedule audio buffer
+  const buffer = audioContext.createBuffer(1, float32.length, 24000);
+  buffer.getChannelData(0).set(float32);
 
-    const pcm16 = new Int16Array(bytes.buffer);
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioContext.destination);
 
-    // Convert to Float32 for Web Audio
-    const float32 = new Float32Array(pcm16.length);
-    for (let i = 0; i < pcm16.length; i++) {
-      float32[i] = pcm16[i] / 0x7fff;
-    }
+  // Schedule for gapless playback
+  const startTime = Math.max(audioContext.currentTime, nextStartTimeRef.current);
+  source.start(startTime);
+  nextStartTimeRef.current = startTime + buffer.duration;
 
-    // Create buffer
-    const buffer = audioContext.createBuffer(1, float32.length, 24000);
-    buffer.getChannelData(0).set(float32);
-
-    // Schedule playback
-    const source = audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioContext.destination);
-
-    const currentTime = audioContext.currentTime;
-    const startTime = Math.max(currentTime, nextStartTimeRef.current);
-
-    source.start(startTime);
-    nextStartTimeRef.current = startTime + buffer.duration;
-
-    audioQueueRef.current.push(source);
-  } catch (error) {
-    console.error("Error playing audio:", error);
-  }
+  audioQueueRef.current.push(source);
 };
 ```
 
-**Audio Playback Pipeline:**
+**Scheduled Playback:**
 ```
-Base64 String → Binary → Int16 Array → Float32 Array → AudioBuffer → Speaker
-```
-
-**Scheduling Audio Chunks:**
-```
-Time ─────────────────────────────────────────────────►
-
+Time ────────────────────────────────────────────►
 Chunk 1: [████████]
 Chunk 2:           [████████]
 Chunk 3:                     [████████]
-          ↑                   ↑
-     startTime          nextStartTime
-```
-
-**Why schedule instead of play immediately?**
-- Audio chunks arrive faster than they play
-- Scheduling ensures gapless playback
-- `nextStartTimeRef` tracks when the next chunk should start
-
----
-
-## Part 3: Data Flow Summary
-
-### Complete Request-Response Cycle
-
-```
-1. User speaks into microphone
-        ↓
-2. Browser captures audio (Float32, 24kHz)
-        ↓
-3. Convert to PCM16, encode as Base64
-        ↓
-4. Send WebSocket message: { type: "input_audio_buffer.append", audio: "..." }
-        ↓
-5. Server relay to OpenAI
-        ↓
-6. OpenAI VAD detects speech end
-        ↓
-7. OpenAI processes and generates response
-        ↓
-8. OpenAI sends audio chunks: { type: "response.audio.delta", delta: "..." }
-        ↓
-9. Server relay to browser
-        ↓
-10. Browser decodes Base64 → PCM16 → Float32
-        ↓
-11. Schedule audio playback through speakers
 ```
 
 ---
 
-## Part 4: Running the Voice Assistant
+## Part 3: Text Chat Alternative (sb-assistant/page.tsx)
+
+For users who prefer text chat, there's also a text-based interface:
+
+```tsx
+"use client";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+
+export default function SBAssistant() {
+  const [input, setInput] = useState("");
+
+  const { messages, status, sendMessage } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/sb-info-bank",
+    }),
+  });
+
+  return (
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      sendMessage({ text: input });
+      setInput("");
+    }}>
+      {/* Chat UI */}
+    </form>
+  );
+}
+```
+
+**Key Differences from Voice:**
+- Uses AI SDK's `useChat` hook
+- Text-based input/output
+- Same tools available via `/api/sb-info-bank`
+
+---
+
+## Part 4: Running the Application
 
 ### Prerequisites
 
-1. Install dependencies:
 ```bash
-npm install ws
+# Install dependencies
+npm install ws mongodb
 npm install -D @types/ws
 ```
 
-2. Set environment variable:
+### Environment Variables
+
 ```env
 OPENAI_API_KEY=sk-your-api-key
+DATABASE_URL=mongodb+srv://user:pass@cluster.mongodb.net/dbname
 ```
 
 ### Start the Server
 
 ```bash
-# Use the custom WebSocket server (NOT next dev)
+# Use custom WebSocket server (NOT next dev)
 npm run dev:ws
 ```
 
-### Access the Page
+### Access Pages
 
-Open `http://localhost:3000/voice-assistant`
+- Voice Assistant: `http://localhost:3000/voice-assistant`
+- Text Chat: `http://localhost:3000/sb-assistant`
+- View Bookings: `http://localhost:3000/booking`
 
 ---
 
-## Part 5: Troubleshooting
+## Part 5: Complete Data Flow
+
+### Voice Conversation with Tool Call
+
+```
+1. User speaks: "I want to book a consultation"
+        ↓
+2. Browser captures audio (Float32, 24kHz)
+        ↓
+3. Convert to PCM16, encode as Base64
+        ↓
+4. WebSocket send: { type: "input_audio_buffer.append", audio: "..." }
+        ↓
+5. Server relays to OpenAI
+        ↓
+6. OpenAI VAD detects speech end
+        ↓
+7. OpenAI processes and decides to call createBooking tool
+        ↓
+8. Server receives: response.function_call_arguments.done
+        ↓
+9. But wait - AI needs user info first, so it asks for name/email/phone
+        ↓
+10. User provides info through voice
+        ↓
+11. AI calls createBooking with { name, email, phone }
+        ↓
+12. Server executes tool → MongoDB insert
+        ↓
+13. Server sends result back to OpenAI
+        ↓
+14. OpenAI generates confirmation response
+        ↓
+15. Audio chunks sent to browser
+        ↓
+16. Browser plays: "Booking confirmed for John..."
+```
+
+---
+
+## Part 6: Troubleshooting
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| "Failed to access microphone" | Permission denied | Allow microphone in browser |
-| "Connection error" | Server not running | Use `npm run dev:ws` not `npm run dev` |
-| No audio playback | AudioContext suspended | Click page first (browser policy) |
-| Audio choppy | Network latency | Check connection, reduce buffer size |
-| Immediate disconnect | API error | Check console for OpenAI error message |
-| "server_error" from OpenAI | API issue | May be transient, retry later |
+| "Failed to access microphone" | Permission denied | Allow mic in browser |
+| "Connection error" | Wrong server | Use `npm run dev:ws` |
+| No audio playback | AudioContext suspended | Click page first |
+| Tool not executing | Check server logs | Look for "Tool call:" logs |
+| Booking not saving | MongoDB connection | Check DATABASE_URL |
+| "server_error" from OpenAI | API issue | Retry or check status |
 
 ---
 
-## Part 6: Key Takeaways
+## Part 7: Key Takeaways
 
-1. **WebSocket Relay Pattern**: Server acts as secure proxy between browser and API
+1. **WebSocket Relay**: Server proxies between browser and OpenAI, hiding API key
 2. **Audio Format**: PCM16 at 24kHz is required by OpenAI Realtime
-3. **Base64 Encoding**: Binary audio data must be encoded for JSON transport
-4. **Scheduled Playback**: Audio chunks must be scheduled, not played immediately
-5. **VAD (Voice Activity Detection)**: Server detects when user stops speaking
-6. **Cleanup**: Always close connections and stop audio when done
+3. **Base64 Encoding**: Binary audio must be encoded for JSON transport
+4. **Tool Integration**: Server executes tools and returns results to OpenAI
+5. **Async Tools**: Database operations work with async/await in tool handlers
+6. **Scheduled Playback**: Audio chunks must be scheduled for gapless playback
+7. **VAD**: Server-side Voice Activity Detection handles turn-taking
